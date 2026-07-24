@@ -1,0 +1,16 @@
+[package]
+name = "thumper-v2"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Anthony Gardner"]
+description = "A lightweight heartbeat-based task liveness monitor with fixed and learned timing"
+license = "MIT"
+repository = "https://github.com/Gardlok/thumper"
+publish = false
+
+[lib]
+name = "thumper_v2"
+path = "src/lib.rs"
+
+[dependencies]
