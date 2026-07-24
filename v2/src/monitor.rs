@@ -3,17 +3,15 @@ use std::{
     error::Error,
     fmt,
     sync::{
-        atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering},
         Arc, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard,
+        atomic::{AtomicU8, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
 
 use crate::{
-    config::{
-        FixedTiming, LearnedTiming, RegisterError, RetrainError, TaskConfig, Timing,
-    },
-    learning::{lock_learning, LearningState},
+    config::{FixedTiming, LearnedTiming, RegisterError, RetrainError, TaskConfig, Timing},
+    learning::{LearningState, lock_learning},
     status::{Health, StopReason, TaskId, TaskStatus, TimingStatus},
 };
 
@@ -194,10 +192,8 @@ impl Monitor {
         match &entry.timing {
             TimingState::Fixed(_) => Err(RetrainError::FixedTiming),
             TimingState::Learned { config, state } => {
-                let skip_next_interval =
-                    entry.last_tick.load(Ordering::Acquire) != NO_TICK;
-                lock_learning(state)
-                    .reset_for_retraining(config.model, skip_next_interval);
+                let skip_next_interval = entry.last_tick.load(Ordering::Acquire) != NO_TICK;
+                lock_learning(state).reset_for_retraining(config.model, skip_next_interval);
                 Ok(())
             }
         }
@@ -249,14 +245,11 @@ impl Heartbeat {
         }
 
         let previous = self.entry.last_tick.swap(tick, Ordering::AcqRel);
-        self.entry
-            .heartbeat_count
-            .fetch_add(1, Ordering::Relaxed);
+        self.entry.heartbeat_count.fetch_add(1, Ordering::Relaxed);
 
         if previous != NO_TICK && tick > previous {
             if let TimingState::Learned { config, state } = &self.entry.timing {
-                lock_learning(state)
-                    .observe(tick_duration(tick, previous), *config);
+                lock_learning(state).observe(tick_duration(tick, previous), *config);
             }
         }
 
@@ -284,9 +277,7 @@ impl Heartbeat {
 
 impl Clone for Heartbeat {
     fn clone(&self) -> Self {
-        self.entry
-            .active_handles
-            .fetch_add(1, Ordering::Relaxed);
+        self.entry.active_handles.fetch_add(1, Ordering::Relaxed);
         Self {
             inner: Arc::clone(&self.inner),
             entry: Arc::clone(&self.entry),
@@ -296,17 +287,11 @@ impl Clone for Heartbeat {
 
 impl Drop for Heartbeat {
     fn drop(&mut self) {
-        let previous = self
-            .entry
-            .active_handles
-            .fetch_sub(1, Ordering::AcqRel);
+        let previous = self.entry.active_handles.fetch_sub(1, Ordering::AcqRel);
         debug_assert!(previous > 0, "heartbeat handle count underflow");
 
         if previous == 1 {
-            self.mark_stopped_at(
-                StopReason::LastHandleDropped,
-                self.inner.now_tick(),
-            );
+            self.mark_stopped_at(StopReason::LastHandleDropped, self.inner.now_tick());
         }
     }
 }
@@ -399,24 +384,14 @@ fn running_status(entry: &TaskEntry, now: u64) -> (Health, TimingStatus) {
                 let deadline = state
                     .deadline(*config)
                     .expect("trained learned timing must have a deadline");
-                return (
-                    classify_health(silent_for, deadline, interval),
-                    status,
-                );
+                return (classify_health(silent_for, deadline, interval), status);
             }
 
-            let provisional_deadline =
-                state.deadline(*config).unwrap_or(entry.startup_grace);
+            let provisional_deadline = state.deadline(*config).unwrap_or(entry.startup_grace);
             if silent_for > provisional_deadline {
-                let interval = state
-                    .estimated_interval()
-                    .unwrap_or(provisional_deadline);
+                let interval = state.estimated_interval().unwrap_or(provisional_deadline);
                 return (
-                    classify_health(
-                        silent_for,
-                        provisional_deadline,
-                        interval,
-                    ),
+                    classify_health(silent_for, provisional_deadline, interval),
                     status,
                 );
             }
@@ -434,11 +409,7 @@ fn running_status(entry: &TaskEntry, now: u64) -> (Health, TimingStatus) {
     }
 }
 
-fn classify_health(
-    silent_for: Duration,
-    deadline: Duration,
-    interval: Duration,
-) -> Health {
+fn classify_health(silent_for: Duration, deadline: Duration, interval: Duration) -> Health {
     if silent_for <= deadline {
         Health::Healthy {
             silent_for,
@@ -467,10 +438,7 @@ fn timing_status(timing: &TimingState) -> TimingStatus {
     }
 }
 
-fn learned_timing_status(
-    config: LearnedTiming,
-    state: &LearningState,
-) -> TimingStatus {
+fn learned_timing_status(config: LearnedTiming, state: &LearningState) -> TimingStatus {
     let confidence = state.confidence(config);
 
     if state.is_trained() {
@@ -512,8 +480,7 @@ fn interval_count(elapsed: Duration, interval: Duration) -> u64 {
         return 0;
     }
 
-    (elapsed.as_nanos() / interval.as_nanos())
-        .min(u128::from(u64::MAX)) as u64
+    (elapsed.as_nanos() / interval.as_nanos()).min(u128::from(u64::MAX)) as u64
 }
 
 #[cfg(test)]
