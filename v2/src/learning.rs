@@ -116,11 +116,7 @@ impl LearningState {
         }
     }
 
-    pub(crate) fn reset_for_retraining(
-        &mut self,
-        model: LearningModel,
-        skip_next_interval: bool,
-    ) {
+    pub(crate) fn reset_for_retraining(&mut self, model: LearningModel, skip_next_interval: bool) {
         *self = Self::new(model);
         self.skip_next_interval = skip_next_interval;
     }
@@ -169,15 +165,16 @@ impl LearningState {
     fn should_adapt(&self, config: LearnedTiming) -> bool {
         match &self.estimator {
             EstimatorState::Ewma(_) => config.adaptation.alpha() > 0.0,
-            EstimatorState::Robust(_) => config
-                .adaptation
-                .robust_update_stride()
-                .is_some_and(|stride| {
-                    let post_training = self
-                        .accepted_samples
-                        .saturating_sub(config.minimum_samples);
-                    post_training.checked_rem(stride) == Some(0)
-                }),
+            EstimatorState::Robust(_) => {
+                config
+                    .adaptation
+                    .robust_update_stride()
+                    .is_some_and(|stride| {
+                        let post_training =
+                            self.accepted_samples.saturating_sub(config.minimum_samples);
+                        post_training.checked_rem(stride) == Some(0)
+                    })
+            }
         }
     }
 
@@ -228,9 +225,7 @@ impl LearningState {
 
     fn center_micros(&self) -> Option<f64> {
         match &self.estimator {
-            EstimatorState::Ewma(state) => {
-                (self.accepted_samples > 0).then_some(state.mean_micros)
-            }
+            EstimatorState::Ewma(state) => (self.accepted_samples > 0).then_some(state.mean_micros),
             EstimatorState::Robust(state) => state.center_micros(),
         }
     }
@@ -299,9 +294,7 @@ impl LearningState {
     }
 }
 
-pub(crate) fn lock_learning(
-    state: &Mutex<LearningState>,
-) -> MutexGuard<'_, LearningState> {
+pub(crate) fn lock_learning(state: &Mutex<LearningState>) -> MutexGuard<'_, LearningState> {
     state
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
