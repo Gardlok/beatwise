@@ -1,9 +1,4 @@
-use std::{
-    error::Error,
-    fmt,
-    sync::Arc,
-    time::Duration,
-};
+use std::{error::Error, fmt, sync::Arc, time::Duration};
 
 pub(crate) const MAX_ROBUST_WINDOW: usize = 31;
 
