@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use super::{Health, Monitor, StopReason, TimingStatus};
 use crate::{
-    Adaptation, Confidence, ConfigError, FixedTiming, LearnedTiming,
-    LearningModel, RegisterError, RetrainError, TaskConfig, Timing,
+    Adaptation, Confidence, ConfigError, FixedTiming, LearnedTiming, LearningModel, RegisterError,
+    RetrainError, TaskConfig, Timing,
 };
 
 #[test]
@@ -13,8 +13,7 @@ fn fixed_timing_becomes_healthy_then_late() {
         .register(TaskConfig::new(
             "fixed-worker",
             Timing::Fixed(
-                FixedTiming::new(Duration::from_millis(10))
-                    .with_grace(Duration::from_millis(2)),
+                FixedTiming::new(Duration::from_millis(10)).with_grace(Duration::from_millis(2)),
             ),
         ))
         .expect("valid fixed registration");
@@ -59,10 +58,7 @@ fn learned_timing_trains_without_retaining_history() {
         .status_at(heartbeat.id(), start + 4_500)
         .expect("status exists");
     assert!(matches!(healthy.health, Health::Healthy { .. }));
-    assert!(matches!(
-        healthy.timing,
-        TimingStatus::Learned { .. }
-    ));
+    assert!(matches!(healthy.timing, TimingStatus::Learned { .. }));
 
     let late = monitor
         .status_at(heartbeat.id(), start + 6_000)
@@ -84,10 +80,7 @@ fn final_handle_drop_preserves_stopped_record() {
 
     drop(heartbeat);
     let still_running = monitor.status(id).expect("record retained");
-    assert!(!matches!(
-        still_running.health,
-        Health::Stopped { .. }
-    ));
+    assert!(!matches!(still_running.health, Health::Stopped { .. }));
 
     drop(clone);
     let stopped = monitor.status(id).expect("stopped record retained");
@@ -141,10 +134,7 @@ fn robust_window_resists_a_training_outlier() {
         .with_adaptation(Adaptation::FrozenAfterTraining)
         .with_model(LearningModel::robust_window(5));
     let heartbeat = monitor
-        .register(TaskConfig::new(
-            "robust-learner",
-            Timing::Learned(learned),
-        ))
+        .register(TaskConfig::new("robust-learner", Timing::Learned(learned)))
         .expect("valid robust registration");
 
     let start = heartbeat.entry.created_tick;
@@ -218,10 +208,7 @@ fn confidence_increases_with_stable_evidence() {
         .with_adaptation(Adaptation::Continuous)
         .with_model(LearningModel::robust_window(5));
     let heartbeat = monitor
-        .register(TaskConfig::new(
-            "confidence",
-            Timing::Learned(learned),
-        ))
+        .register(TaskConfig::new("confidence", Timing::Learned(learned)))
         .expect("valid learned registration");
 
     let start = heartbeat.entry.created_tick;
@@ -254,10 +241,7 @@ fn retraining_discards_the_old_baseline() {
         .with_minimum_grace(Duration::from_micros(100))
         .with_adaptation(Adaptation::FrozenAfterTraining);
     let heartbeat = monitor
-        .register(TaskConfig::new(
-            "retrain",
-            Timing::Learned(learned),
-        ))
+        .register(TaskConfig::new("retrain", Timing::Learned(learned)))
         .expect("valid learned registration");
     let id = heartbeat.id();
     let start = heartbeat.entry.created_tick;
@@ -321,20 +305,14 @@ fn fixed_timing_cannot_be_retrained() {
 #[test]
 fn invalid_robust_window_capacity_is_rejected() {
     let monitor = Monitor::new();
-    let learned = LearnedTiming::default()
-        .with_model(LearningModel::robust_window(4));
+    let learned = LearnedTiming::default().with_model(LearningModel::robust_window(4));
     let error = monitor
-        .register(TaskConfig::new(
-            "invalid-window",
-            Timing::Learned(learned),
-        ))
+        .register(TaskConfig::new("invalid-window", Timing::Learned(learned)))
         .err()
         .expect("registration must fail");
 
     assert_eq!(
         error,
-        RegisterError::InvalidConfig(
-            ConfigError::InvalidRobustWindowCapacity
-        )
+        RegisterError::InvalidConfig(ConfigError::InvalidRobustWindowCapacity)
     );
 }
