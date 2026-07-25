@@ -1,12 +1,6 @@
-//! A lightweight heartbeat-based task liveness monitor.
-//!
-//! Thumper v2 keeps heartbeat collection inexpensive and runtime-neutral. It
-//! supports fixed intervals, bounded learned-frequency models, bounded
-//! repeating-pattern discovery, pull-driven health transitions, and
-//! policy-driven aggregate reports without spawning threads or retaining an
-//! unbounded event history.
-
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
+#![deny(rustdoc::broken_intra_doc_links)]
 
 mod config;
 mod learning;
