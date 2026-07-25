@@ -57,7 +57,8 @@ impl TransitionCursor {
     /// `Starting`, `Learning`, `Healthy`, `Late`, or `Stopped` changes.
     #[must_use]
     pub fn poll(&mut self) -> Vec<HealthTransition> {
-        self.poll_at(self.inner.now_tick())
+        let now = self.inner.now_tick();
+        self.poll_at(now)
     }
 
     /// Observes one retained task and returns its next meaningful state change.
@@ -66,7 +67,8 @@ impl TransitionCursor {
     /// for that ID by this cursor.
     #[must_use]
     pub fn poll_task(&mut self, id: TaskId) -> Option<HealthTransition> {
-        self.poll_task_at(id, self.inner.now_tick())
+        let now = self.inner.now_tick();
+        self.poll_task_at(id, now)
     }
 
     /// Returns the number of task-state tags retained by this cursor.
