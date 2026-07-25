@@ -6,7 +6,12 @@ rust-version = "1.85"
 authors = ["Anthony Gardner"]
 description = "A lightweight heartbeat-based task liveness monitor with fixed and learned timing"
 license = "MIT"
+readme = "README.md"
 repository = "https://github.com/Gardlok/thumper"
+homepage = "https://github.com/Gardlok/thumper"
+documentation = "https://docs.rs/thumper-v2"
+keywords = ["heartbeat", "health-check", "liveness", "monitoring", "reliability"]
+categories = ["concurrency", "development-tools::debugging"]
 publish = false
 
 [lib]
