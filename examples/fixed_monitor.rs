@@ -1,6 +1,6 @@
 use std::{error::Error, time::Duration};
 
-use thumper::{Monitor, TaskConfig, Timing};
+use beatwise::{Monitor, TaskConfig, Timing};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let monitor = Monitor::new();
