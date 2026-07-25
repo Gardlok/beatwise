@@ -9,10 +9,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_minimum_grace(Duration::from_millis(25))
         .with_adaptation(Adaptation::Slow)
         .with_model(LearningModel::robust_window(5));
-    let heartbeat = monitor.register(TaskConfig::new(
-        "learned-worker",
-        Timing::Learned(timing),
-    ))?;
+    let heartbeat = monitor.register(TaskConfig::new("learned-worker", Timing::Learned(timing)))?;
 
     heartbeat.beat()?;
 
