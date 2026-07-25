@@ -12,16 +12,20 @@ use std::{
 use crate::{
     config::{FixedTiming, LearnedTiming, RegisterError, RetrainError, TaskConfig, Timing},
     learning::{LearningState, lock_learning},
+    report::{HealthCounts, HealthPolicy, HealthReport, HealthSummary},
     status::{Health, HealthState, StopReason, TaskId, TaskStatus, TimingStatus},
 };
 
 include!("registry.rs");
 include!("heartbeat.rs");
 include!("classification.rs");
+include!("reporting.rs");
 include!("transitions.rs");
 
 #[cfg(test)]
 mod pattern_tests;
+#[cfg(test)]
+mod report_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
