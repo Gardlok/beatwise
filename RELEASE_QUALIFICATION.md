@@ -23,6 +23,13 @@ remains recoverable through Git history, but it is not duplicated or packaged.
 Run from the repository root:
 
 ```bash
+test ! -d v2 &&
+! grep -R \
+  --exclude-dir=.git \
+  --exclude-dir=target \
+  --exclude='*.md' \
+  -nE 'thumper_v2|thumper-v2' . &&
+cargo tree --depth 0 &&
 cargo fmt --all --check &&
 cargo clippy --all-targets -- -D warnings &&
 cargo test &&
@@ -53,7 +60,8 @@ archive rather than only the repository working tree.
 - No legacy runtime dependencies remain in `Cargo.toml`.
 - No legacy DJ, deck, output, tuning, benchmark, or example modules remain in
   the active repository tree.
-- Public examples and integration tests import `thumper`, not `thumper_v2`.
+- Public examples and integration tests import `thumper`; no obsolete staging
+  crate identifier remains in code or package metadata.
 - The README is the crate-level rustdoc source.
 - Publication remains disabled until a later explicit release task.
 
