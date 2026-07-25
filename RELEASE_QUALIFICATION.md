@@ -7,7 +7,7 @@ package identity.
 ## Qualified boundary
 
 - Product, package, library crate, and Rust import path: `beatwise` 0.2.0
-- Current repository location: `Gardlok/thumper`
+- Canonical repository: `Gardlok/beatwise`
 - Rust edition: 2024
 - Minimum supported Rust version: 1.85
 - Runtime dependencies: none
@@ -31,6 +31,8 @@ test ! -d v2 &&
   --exclude-dir=target \
   --exclude='*.md' \
   -nE 'thumper_v2|thumper-monitor|use thumper::' . &&
+grep -q 'repository = "https://github.com/Gardlok/beatwise"' Cargo.toml &&
+grep -q 'homepage = "https://github.com/Gardlok/beatwise"' Cargo.toml &&
 cargo tree --depth 0 &&
 cargo fmt --all --check &&
 cargo clippy --all-targets -- -D warnings &&
@@ -61,6 +63,7 @@ archive rather than only the repository working tree.
 
 - `cargo metadata` resolves one root package named `beatwise`.
 - The library target and Rust import path are `beatwise`.
+- Package repository and homepage metadata point to `Gardlok/beatwise`.
 - No `v2/` package remains.
 - No legacy runtime dependencies remain in `Cargo.toml`.
 - No legacy DJ, deck, output, tuning, benchmark, or example modules remain in
@@ -69,6 +72,5 @@ archive rather than only the repository working tree.
 - The README is the crate-level rustdoc source.
 - Publication remains disabled until a later explicit release task.
 
-Passing this gate completes the package-identity qualification. It does not
-publish, tag, rename the GitHub repository, create a release, or enable automated
-publication.
+Passing this gate completes the package-identity and canonical-link qualification.
+It does not publish, tag, create a release, or enable automated publication.
