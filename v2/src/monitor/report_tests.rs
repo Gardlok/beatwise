@@ -130,10 +130,8 @@ fn liveness_ignores_stopped_tasks() {
         .expect("valid stopped task");
     stopped.mark_stopped_at(StopReason::Explicit, stopped.entry.created_tick + 1_000);
 
-    let stopped_only = monitor.summary_at(
-        HealthPolicy::liveness(),
-        stopped.entry.created_tick + 2_000,
-    );
+    let stopped_only =
+        monitor.summary_at(HealthPolicy::liveness(), stopped.entry.created_tick + 2_000);
     assert_eq!(stopped_only.verdict, HealthVerdict::Empty);
     assert_eq!(stopped_only.considered_tasks, 0);
     assert_eq!(stopped_only.ignored_tasks, 1);
@@ -188,8 +186,7 @@ fn custom_policy_can_degrade_instead_of_fail_a_late_task() {
         .beat_at(start + 1_000)
         .expect("heartbeat accepted");
 
-    let policy = HealthPolicy::liveness()
-        .with_impact(HealthState::Late, HealthImpact::Degraded);
+    let policy = HealthPolicy::liveness().with_impact(HealthState::Late, HealthImpact::Degraded);
     assert_eq!(policy.impact(HealthState::Late), HealthImpact::Degraded);
 
     let summary = monitor.summary_at(policy, start + 20_000);
