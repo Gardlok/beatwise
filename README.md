@@ -1,5 +1,7 @@
 # Beatwise
 
+[crates.io](https://crates.io/crates/beatwise) · [API documentation](https://docs.rs/beatwise) · [repository](https://github.com/Gardlok/beatwise)
+
 Beatwise is a small Rust library for watching long-running work.
 
 A task calls `beat()` whenever it makes progress. Beatwise tracks that rhythm and
@@ -11,6 +13,43 @@ device pollers, backups, peer maintenance, and other jobs that should keep movin
 Beatwise can watch a known interval, learn a task's normal pace, or learn a
 repeating cycle. It uses only the standard library, starts no threads, and does
 not require an async runtime.
+
+## Installation
+
+```bash
+cargo add beatwise
+```
+
+Beatwise supports Rust 1.85 and newer.
+
+## Quick start
+
+Register a task, keep the returned heartbeat handle with the work, and call
+`beat()` whenever meaningful progress completes:
+
+```rust
+use std::time::Duration;
+use beatwise::{Monitor, TaskConfig, Timing};
+
+let monitor = Monitor::new();
+let heartbeat = monitor.register(TaskConfig::new(
+    "worker",
+    Timing::fixed(Duration::from_secs(5)),
+))?;
+
+heartbeat.beat()?;
+
+let status = monitor
+    .status(heartbeat.id())
+    .expect("registered task remains retained");
+println!("{}: {:?}", status.name, status.health);
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+A heartbeat should mean that work advanced, not merely that a process or thread
+still exists. Beatwise reports health when the caller asks; it does not wake,
+restart, cancel, retry, or schedule the monitored work.
 
 ## What it provides
 
@@ -24,6 +63,43 @@ not require an async runtime.
 All timing stays inside the caller's process. Fixed heartbeats use atomics and a
 monotonic clock read. Learned tasks add one small mutex. Stopped tasks remain
 visible until explicitly purged.
+
+## Choosing a timing model
+
+| Model | Best for | Main tradeoff |
+| --- | --- | --- |
+| Fixed | Pollers, schedulers, and jobs with a known expected interval | The caller must choose the interval and grace period |
+| EWMA | Workloads whose normal pace changes gradually | Accepted observations continuously influence the baseline |
+| Robust window | Bursty work with occasional extreme pauses or outliers | Keeps a small bounded sample window and requires an odd capacity |
+| Repeating pattern | Stable multi-phase work such as short/long processing cycles | Requires several complete cycles before the pattern is trusted |
+
+Use fixed timing when the expected interval is part of the task's contract. Use
+learned timing when the workload itself is the best source of that expectation.
+
+## Lifecycle and ownership
+
+A fixed task begins in `Starting` and becomes `Healthy` after its first beat. A
+learned task begins in `Learning` and remains there until enough accepted
+intervals establish a baseline. Running tasks then move between `Healthy` and
+`Late` as their silence crosses the current deadline.
+
+```text
+fixed:    Starting ── first beat ──> Healthy <──> Late
+learned:  Learning ── trained ─────> Healthy <──> Late
+
+running task ── explicit stop or final heartbeat drop ──> Stopped
+Stopped ── Monitor::purge_stopped() ────────────────────> removed
+```
+
+`Heartbeat` clones refer to the same task. An explicit `stop()` is task-wide, so
+other clones can no longer beat. Dropping the final clone also marks the task as
+stopped. A stopped record remains observable until `Monitor::purge_stopped()`
+removes it, and a stopped handle cannot revive a purged task.
+
+`Monitor` is cheap to clone and may be shared between observers. Heartbeat clones
+are safe to move between threads. For learned timing, remember that every call to
+`beat()` is treated as the next interval in one logical progress stream; unrelated
+concurrent producers should usually be registered as separate tasks.
 
 ## Learn a task's normal pace
 
@@ -154,7 +230,9 @@ for transition in transitions.poll() {
 ```
 
 Each cursor is independent. `poll()` returns only state changes, ordered by task
-ID. Beatwise does not run callbacks or own an executor.
+ID. A transition's observation time is when the cursor polled the monitor, not an
+exact historical timestamp for the instant the state changed. Beatwise does not
+run callbacks or own an executor.
 
 ## Build health endpoints
 
@@ -194,6 +272,18 @@ for task in liveness.tasks.iter() {
 `readiness()` treats starting and learning tasks as degraded. `liveness()` allows
 those states, fails late tasks, and ignores stopped records. `strict()` accepts
 only healthy tasks. Custom policies can change how any state affects the verdict.
+
+## Examples
+
+The repository includes runnable examples for fixed timing, learned timing,
+aggregate health reports, and a standard-library worker thread:
+
+```bash
+cargo run --example fixed_monitor
+cargo run --example learned_monitor
+cargo run --example health_report
+cargo run --example worker_loop
+```
 
 ## Version note
 
