@@ -96,8 +96,14 @@ fn independent_cursors_observe_the_same_changes() {
     heartbeat
         .beat_at(start + 1_000)
         .expect("heartbeat accepted");
-    assert_eq!(first.poll_at(start + 2_000)[0].current, HealthState::Healthy);
-    assert_eq!(second.poll_at(start + 2_000)[0].current, HealthState::Healthy);
+    assert_eq!(
+        first.poll_at(start + 2_000)[0].current,
+        HealthState::Healthy
+    );
+    assert_eq!(
+        second.poll_at(start + 2_000)[0].current,
+        HealthState::Healthy
+    );
 }
 
 #[test]
@@ -114,7 +120,7 @@ fn retraining_is_reported_as_a_return_to_learning() {
     let start = heartbeat.entry.created_tick;
     let mut cursor = monitor.transition_cursor();
 
-    cursor.poll_at(start);
+    assert_eq!(cursor.poll_at(start)[0].current, HealthState::Starting);
     for offset in [1_000, 2_000, 3_000] {
         heartbeat
             .beat_at(start + offset)
@@ -123,7 +129,10 @@ fn retraining_is_reported_as_a_return_to_learning() {
 
     let trained = cursor.poll_at(start + 3_500);
     assert_eq!(trained[0].current, HealthState::Healthy);
-    assert!(matches!(trained[0].status.timing, TimingStatus::Learned { .. }));
+    assert!(matches!(
+        trained[0].status.timing,
+        TimingStatus::Learned { .. }
+    ));
 
     monitor
         .retrain(heartbeat.id())
@@ -151,7 +160,7 @@ fn stopped_tasks_are_reported_then_pruned_after_purge() {
     let start = heartbeat.entry.created_tick;
     let mut cursor = monitor.transition_cursor();
 
-    cursor.poll_at(start);
+    assert_eq!(cursor.poll_at(start)[0].current, HealthState::Starting);
     heartbeat.stop();
 
     let stopped = cursor.poll_at(start + 1_000);
