@@ -6,7 +6,7 @@ future publication of Beatwise 0.2.0.
 ## Package identity
 
 - Product name: **Beatwise**
-- Current repository location: `Gardlok/thumper`
+- Canonical repository: `Gardlok/beatwise`
 - crates.io package name: `beatwise`
 - Library crate and Rust import path: `beatwise`
 - Version: `0.2.0`
@@ -15,9 +15,9 @@ future publication of Beatwise 0.2.0.
 - Runtime dependencies: none
 - Publication: disabled until a separate explicitly authorized release task
 
-The former Thumper identity is retained only in repository history and the
-current GitHub repository path. Package metadata, documentation, examples, and
-Rust imports use one consistent Beatwise identity.
+The former Thumper identity is retained only in repository history. The active
+repository, package metadata, documentation, examples, and Rust imports use one
+consistent Beatwise identity.
 
 Registry availability is time-sensitive. Immediately before publication, repeat
 the exact-name check rather than relying on this document or an older search.
@@ -27,6 +27,8 @@ the exact-name check rather than relying on this document or an older search.
 Run from a clean checkout of the candidate commit:
 
 ```bash
+grep -q 'repository = "https://github.com/Gardlok/beatwise"' Cargo.toml &&
+grep -q 'homepage = "https://github.com/Gardlok/beatwise"' Cargo.toml &&
 cargo tree --depth 0 &&
 cargo fmt --all --check &&
 cargo clippy --all-targets -- -D warnings &&
@@ -45,6 +47,7 @@ git status
 
 Expected results:
 
+- package repository and homepage metadata point to `Gardlok/beatwise`;
 - `cargo tree --depth 0` shows `beatwise v0.2.0` and no dependencies;
 - 30 internal unit tests pass;
 - 4 external integration tests pass;
@@ -81,9 +84,8 @@ publish = false
 ```
 
 Enabling publication, authenticating Cargo, uploading the crate, creating a Git
-tag, renaming the GitHub repository, or creating a GitHub release are all outside
-this phase. Those actions require separate explicit authorization after the full
-gate above passes.
+tag, or creating a GitHub release are all outside this phase. Those actions
+require separate explicit authorization after the full gate above passes.
 
 ## Future authorized release sequence
 
@@ -91,13 +93,12 @@ Once publication is explicitly authorized:
 
 1. Reconfirm the exact candidate commit and clean worktree.
 2. Recheck the `beatwise` registry name.
-3. Decide whether to rename the GitHub repository before release.
-4. Review the generated package contents and extracted build one final time.
-5. Change the publication setting in a focused release PR.
-6. Merge only after local qualification passes again.
-7. Publish the exact merged commit.
-8. Verify crates.io and docs.rs metadata.
-9. Tag the published commit and create release notes from `CHANGELOG.md`.
+3. Review the generated package contents and extracted build one final time.
+4. Change the publication setting in a focused release PR.
+5. Merge only after local qualification passes again.
+6. Publish the exact merged commit.
+7. Verify crates.io and docs.rs metadata.
+8. Tag the published commit and create release notes from `CHANGELOG.md`.
 
 Publishing is permanent for a given crate version. Never publish from a dirty
 worktree, an unmerged branch, or a commit that differs from the reviewed package.
