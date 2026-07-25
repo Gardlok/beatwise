@@ -7,6 +7,10 @@ API changes in a minor release.
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.2.1] - 2026-07-25
+
 ### Documentation
 
 - Added installation and fixed-timing quick-start guidance.
