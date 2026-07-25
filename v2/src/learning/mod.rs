@@ -5,8 +5,8 @@ use std::{
 
 use crate::{
     config::{
-        LearnedTiming, LearningModel, PatternConfig, MAX_PATTERN_CYCLES, MAX_PATTERN_PERIOD,
-        MAX_ROBUST_WINDOW,
+        LearnedTiming, LearningModel, MAX_PATTERN_CYCLES, MAX_PATTERN_PERIOD, MAX_ROBUST_WINDOW,
+        PatternConfig,
     },
     status::Confidence,
 };
