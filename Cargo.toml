@@ -1,26 +1,22 @@
 [package]
 name = "thumper"
-version = "0.1.1"
-authors = ["Gardlok"]
-edition = "2018"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Anthony Gardner"]
+description = "A lightweight heartbeat-based task liveness monitor with fixed and learned timing"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/Gardlok/thumper"
+homepage = "https://github.com/Gardlok/thumper"
+documentation = "https://docs.rs/thumper"
+keywords = ["heartbeat", "health-check", "liveness", "monitoring", "reliability"]
+categories = ["concurrency", "development-tools::debugging"]
+include = ["src/**/*", "tests/**/*", "examples/**/*", "README.md", "LICENSE"]
+publish = false
+
+[lib]
+name = "thumper"
+path = "src/lib.rs"
 
 [dependencies]
-itertools = "^0.9.0"
-# influx_db_client = "0.5.0"
-smol = "^1.2.4"
-reqwest = {version = "0.11.3", features = ["blocking"]}
-thiserror = "1.0.25"
-# bus = "2.2.3"
-# by_address = "1.0.4"
-
-[dev-dependencies]
-thumper = {path = "../thumper/"}  # Is this the best way ? 
-futures = "^0.3.7"
-rust-embed = "^5.6.0"
-rand = "0.6.5"
-criterion = "0.3.1"
-lazy_static = "1.4.0"
-
-[[bench]]
-name = "benchmark"
-harness = false
