@@ -105,7 +105,7 @@ impl PatternState {
     }
 
     fn best_pattern(&self, minimum_samples: u32) -> Option<PatternCandidate> {
-        let mut best = None;
+        let mut best: Option<PatternCandidate> = None;
         let maximum_period = usize::from(self.config.maximum_period);
         let minimum_cycles = usize::from(self.config.minimum_cycles);
         let minimum_contrast = f64::from(self.config.minimum_contrast_percent) / 100.0;
