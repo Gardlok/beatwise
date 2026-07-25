@@ -1,13 +1,13 @@
-# Thumper
+# Beatwise
 
-Thumper is a lightweight, runtime-neutral heartbeat monitor for long-running tasks.
+Beatwise is a lightweight, runtime-neutral heartbeat monitor for long-running tasks.
 It supports fixed intervals, bounded learned timing, repeating-pattern discovery,
 pull-driven state transitions, and policy-driven aggregate health reports without
 spawning background threads or retaining unbounded event history.
 
-Version 0.2.0 replaces the legacy DJ/deck/output API from the 0.1.x line with the
-modern monitoring core. The old implementation remains available through Git
-history, but it is no longer part of the root package.
+Version 0.2.0 replaces the legacy Thumper DJ/deck/output API from the 0.1.x line
+with the modern monitoring core. The old implementation remains available through
+Git history, but it is no longer part of the root package.
 
 ## Current scope
 
@@ -42,11 +42,11 @@ No timing model retains unbounded history.
 
 Transition observation is bounded and caller-driven. Each cursor stores one
 compact health-state tag per retained task it has observed. Cursors do not retain
-event history, drain a shared queue, or run callbacks on a Thumper-owned thread.
+event history, drain a shared queue, or run callbacks on a Beatwise-owned thread.
 
 Aggregate observation is calculated on demand. A compact summary keeps no task
 snapshot allocation, while a full report returns the same verdict plus sorted
-status snapshots. The caller supplies the policy, so Thumper does not silently
+status snapshots. The caller supplies the policy, so Beatwise does not silently
 assume whether starting, learning, or intentionally stopped tasks should fail a
 particular deployment's health endpoint.
 
@@ -56,7 +56,7 @@ EWMA remains the default and has the smallest per-task state:
 
 ```rust
 use std::time::Duration;
-use thumper::{Adaptation, LearnedTiming, Monitor, TaskConfig, Timing};
+use beatwise::{Adaptation, LearnedTiming, Monitor, TaskConfig, Timing};
 
 let monitor = Monitor::new();
 let timing = LearnedTiming::default()
@@ -84,7 +84,7 @@ bounded robust model:
 
 ```rust
 use std::time::Duration;
-use thumper::{Adaptation, LearnedTiming, LearningModel, Monitor, TaskConfig, Timing};
+use beatwise::{Adaptation, LearnedTiming, LearningModel, Monitor, TaskConfig, Timing};
 
 let monitor = Monitor::new();
 let timing = LearnedTiming::default()
@@ -113,7 +113,7 @@ it to one misleading average:
 
 ```rust
 use std::time::Duration;
-use thumper::{
+use beatwise::{
     Adaptation, LearnedTiming, LearningModel, Monitor, PatternConfig, TaskConfig, Timing,
 };
 
@@ -153,11 +153,11 @@ new baseline.
 ## Health transitions
 
 A transition cursor lets a caller react to state changes without diffing detailed
-snapshots or giving Thumper ownership of an executor:
+snapshots or giving Beatwise ownership of an executor:
 
 ```rust
 use std::time::Duration;
-use thumper::{HealthState, Monitor, TaskConfig, Timing};
+use beatwise::{HealthState, Monitor, TaskConfig, Timing};
 
 let monitor = Monitor::new();
 let heartbeat = monitor.register(TaskConfig::new(
@@ -203,7 +203,7 @@ full report for diagnostics:
 
 ```rust
 use std::time::Duration;
-use thumper::{HealthPolicy, HealthVerdict, Monitor, TaskConfig, Timing};
+use beatwise::{HealthPolicy, HealthVerdict, Monitor, TaskConfig, Timing};
 
 let monitor = Monitor::new();
 let heartbeat = monitor.register(TaskConfig::new(
