@@ -16,7 +16,5 @@ pub use config::{
     Adaptation, ConfigError, FixedTiming, LearnedTiming, LearningModel, PatternConfig,
     RegisterError, RetrainError, TaskConfig, Timing,
 };
-pub use monitor::{Heartbeat, HealthTransition, Monitor, StoppedError, TransitionCursor};
-pub use status::{
-    Confidence, Health, HealthState, StopReason, TaskId, TaskStatus, TimingStatus,
-};
+pub use monitor::{HealthTransition, Heartbeat, Monitor, StoppedError, TransitionCursor};
+pub use status::{Confidence, Health, HealthState, StopReason, TaskId, TaskStatus, TimingStatus};
