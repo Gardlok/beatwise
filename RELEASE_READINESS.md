@@ -37,7 +37,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --no-deps &&
 cargo +1.85.0 check --all-targets &&
 cargo +1.85.0 test &&
 cargo package --list &&
-cargo package --allow-dirty &&
+cargo package &&
 cargo run --example fixed_monitor &&
 cargo run --example learned_monitor &&
 cargo run --example health_report
@@ -60,18 +60,43 @@ Expected results:
 
 ## Registry preflight
 
+The crates.io data-access policy requires API clients to send a descriptive
+`User-Agent`. A generic client-only user agent can be rejected with `403
+Forbidden`, which is an access-policy response rather than evidence that a crate
+name is occupied.
+
 Perform this check immediately before any authorized publish operation:
 
 ```bash
+response=/tmp/beatwise-crate.json
 status="$(curl -sS \
-  -o /tmp/beatwise-crate.json \
-  -w '%{http_code}' \
+  --user-agent 'beatwise-release-audit/0.2.0 (https://github.com/Gardlok/beatwise)' \
+  --header 'Accept: application/json' \
+  --output "$response" \
+  --write-out '%{http_code}' \
   https://crates.io/api/v1/crates/beatwise)"
 
-test "$status" = 404
+case "$status" in
+  404)
+    echo "PASS: beatwise is not currently published on crates.io"
+    ;;
+  200)
+    echo "FAIL: beatwise is already present on crates.io" >&2
+    cat "$response" >&2
+    exit 1
+    ;;
+  *)
+    echo "ERROR: crates.io preflight returned HTTP $status" >&2
+    cat "$response" >&2
+    exit 1
+    ;;
+esac
 ```
 
-A response other than `404` means the package identity must be reviewed again.
+Only `404` passes this preflight. `200` means the name is already present. Any
+other response is inconclusive and must be resolved before publication; it must
+not be treated as either availability or ownership.
+
 Do not attempt to publish over an existing package or assume ownership from a
 similar repository name.
 
