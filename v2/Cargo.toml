@@ -12,6 +12,7 @@ homepage = "https://github.com/Gardlok/thumper"
 documentation = "https://docs.rs/thumper-v2"
 keywords = ["heartbeat", "health-check", "liveness", "monitoring", "reliability"]
 categories = ["concurrency", "development-tools::debugging"]
+include = ["src/**/*", "tests/**/*", "examples/**/*", "README.md", "LICENSE"]
 publish = false
 
 [lib]
