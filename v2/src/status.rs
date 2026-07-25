@@ -40,6 +40,20 @@ pub enum StopReason {
     LastHandleDropped,
 }
 
+/// Stable identity of a task's current health state.
+///
+/// Unlike [`Health`], this type deliberately excludes elapsed durations and
+/// other changing detail. It is suitable for detecting meaningful state
+/// transitions without treating every status refresh as a change.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum HealthState {
+    Starting,
+    Learning,
+    Healthy,
+    Late,
+    Stopped,
+}
+
 /// Current health of a monitored task.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Health {
@@ -67,6 +81,20 @@ pub enum Health {
         stopped_for: Duration,
         reason: StopReason,
     },
+}
+
+impl Health {
+    /// Returns the stable state identity for this detailed health value.
+    #[must_use]
+    pub const fn state(&self) -> HealthState {
+        match self {
+            Self::Starting { .. } => HealthState::Starting,
+            Self::Learning { .. } => HealthState::Learning,
+            Self::Healthy { .. } => HealthState::Healthy,
+            Self::Late { .. } => HealthState::Late,
+            Self::Stopped { .. } => HealthState::Stopped,
+        }
+    }
 }
 
 /// Current public view of a task's timing policy.
