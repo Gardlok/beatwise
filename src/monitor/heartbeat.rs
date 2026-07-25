@@ -1,7 +1,13 @@
-/// Handle used by a monitored task to report progress.
+/// Handle used by a monitored task to report meaningful progress.
 ///
-/// Clones refer to the same task. The record becomes stopped only after an
-/// explicit stop or after the final handle is dropped.
+/// Clones refer to the same task and may be moved between threads. An explicit
+/// [`Heartbeat::stop`] is task-wide, and the record also becomes stopped after
+/// the final handle is dropped. Stopped records remain observable until
+/// [`Monitor::purge_stopped`] removes them.
+///
+/// For learned timing, every call to [`Heartbeat::beat`] is treated as the next
+/// interval in one logical progress stream. Unrelated concurrent producers
+/// should usually be registered as separate tasks.
 pub struct Heartbeat {
     inner: Arc<Inner>,
     entry: Arc<TaskEntry>,
@@ -14,12 +20,27 @@ impl Heartbeat {
         self.entry.id
     }
 
-    /// Records a heartbeat at the current monotonic time.
+    /// Records meaningful progress at the current monotonic time.
+    ///
+    /// Fixed timing uses the beat as the new liveness reference point. Learned
+    /// timing also observes the interval since the previous beat after one
+    /// exists. Concurrent calls are safe, but learned timing treats every call
+    /// as part of the same ordered interval stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StoppedError`] after an explicit stop or after the task has
+    /// otherwise entered the stopped lifecycle state.
     pub fn beat(&self) -> Result<(), StoppedError> {
         self.beat_at(self.inner.now_tick())
     }
 
     /// Explicitly marks the task as stopped.
+    ///
+    /// This consumes the calling handle, but the stop applies to the shared task
+    /// record: any remaining clones can no longer beat and will return
+    /// [`StoppedError`]. The stopped record remains available through the
+    /// monitor until [`Monitor::purge_stopped`] removes it.
     pub fn stop(self) {
         self.mark_stopped_at(StopReason::Explicit, self.inner.now_tick());
     }

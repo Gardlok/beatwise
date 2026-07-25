@@ -55,9 +55,12 @@ impl Inner {
     }
 }
 
-/// Registry and observation point for monitored tasks.
+/// Registry and pull-driven observation point for monitored tasks.
 ///
-/// `Monitor` is cheap to clone and does not own a background thread.
+/// `Monitor` is cheap to clone. Every clone shares the same retained task
+/// records, and its methods may be called from multiple threads. It does not own
+/// a background worker, timer, callback executor, or event queue; health is
+/// classified when the caller requests a status, report, or transition poll.
 #[derive(Clone)]
 pub struct Monitor {
     inner: Arc<Inner>,
@@ -83,6 +86,19 @@ impl Monitor {
     }
 
     /// Registers a task and returns its heartbeat handle.
+    ///
+    /// Registration retains one task record until it is removed with
+    /// [`Monitor::purge_stopped`]. Every task begins in
+    /// [`HealthState::Starting`]. After the first beat, fixed timing can become
+    /// [`HealthState::Healthy`], while learned timing enters
+    /// [`HealthState::Learning`] until its baseline is trained. No thread or
+    /// timer is started.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RegisterError`] when the task name is empty, timing or learning
+    /// configuration is invalid, or the monitor's task identifier space is
+    /// exhausted.
     pub fn register(&self, config: TaskConfig) -> Result<Heartbeat, RegisterError> {
         config.validate()?;
 
@@ -127,13 +143,20 @@ impl Monitor {
         })
     }
 
-    /// Returns a compact status snapshot for one task.
+    /// Returns a compact status snapshot for one retained task.
+    ///
+    /// Returns `None` when the identifier is unknown or its stopped record has
+    /// already been purged.
     #[must_use]
     pub fn status(&self, id: TaskId) -> Option<TaskStatus> {
         self.status_at(id, self.inner.now_tick())
     }
 
     /// Returns compact status snapshots for all retained tasks.
+    ///
+    /// The returned vector is a point-in-time observation and has no guaranteed
+    /// ordering. Use a [`TransitionCursor`] when only meaningful state changes
+    /// are needed.
     #[must_use]
     pub fn snapshot(&self) -> Vec<TaskStatus> {
         let now = self.inner.now_tick();
@@ -158,8 +181,15 @@ impl Monitor {
 
     /// Discards a learned baseline and returns the task to its learning phase.
     ///
-    /// The next interval is intentionally ignored so the time between the
-    /// reset request and the next heartbeat cannot contaminate the new model.
+    /// The next interval is intentionally ignored so the time between the reset
+    /// request and the next heartbeat cannot contaminate the new model. The task
+    /// identifier and every existing heartbeat handle remain unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`RetrainError::UnknownTask`] for an unknown or purged task,
+    /// [`RetrainError::Stopped`] for a retained stopped task, and
+    /// [`RetrainError::FixedTiming`] when the task does not use learned timing.
     pub fn retrain(&self, id: TaskId) -> Result<(), RetrainError> {
         let entry = self
             .inner
@@ -183,6 +213,10 @@ impl Monitor {
     }
 
     /// Removes all stopped records and returns the number removed.
+    ///
+    /// Purging does not revive or reset any heartbeat handle. Existing handles
+    /// for a stopped task remain stopped, and transition cursors forget a purged
+    /// task on their next poll.
     pub fn purge_stopped(&self) -> usize {
         let mut tasks = self.inner.write_tasks();
         let previous_len = tasks.len();

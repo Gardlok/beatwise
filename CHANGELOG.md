@@ -7,7 +7,14 @@ API changes in a minor release.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Documentation
+
+- Added installation and fixed-timing quick-start guidance.
+- Added timing-model selection, lifecycle, ownership, and responsibility-boundary documentation.
+- Expanded monitor and heartbeat API rustdoc.
+- Added a runnable standard-library worker-loop example.
+- Added contribution and security policies.
+- Converted the 0.2.0 release-readiness document into a completed release record.
 
 ## [0.2.0] - 2026-07-25
 
@@ -37,5 +44,7 @@ No unreleased changes.
 
 ### Release status
 
-Version 0.2.0 has not been published by this change. The manifest retains
-`publish = false` until a separate, explicitly authorized release task.
+Version 0.2.0 was published to crates.io on 2026-07-25 from commit
+`ff80153a11b66d38c300efabde522cfdb0f5da5a` and tagged as `v0.2.0`.
+The published registry checksum is
+`a9c6792308d79ef698d9f1c87729492190e9b514393abaa8514e2a61131e92c0`.
