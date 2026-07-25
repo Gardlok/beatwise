@@ -13,7 +13,7 @@ documentation = "https://docs.rs/beatwise"
 keywords = ["heartbeat", "health-check", "liveness", "monitoring", "reliability"]
 categories = ["concurrency", "development-tools::debugging"]
 include = ["src/**/*", "tests/**/*", "examples/**/*", "README.md", "CHANGELOG.md", "LICENSE"]
-publish = false
+publish = ["crates-io"]
 
 [lib]
 name = "beatwise"

@@ -1,7 +1,7 @@
 # Beatwise 0.2.0 release readiness
 
-This document defines the gate between the completed root migration and any
-future publication of Beatwise 0.2.0.
+This document defines the gate between the completed release-candidate audit and
+any publication of Beatwise 0.2.0.
 
 ## Package identity
 
@@ -13,7 +13,7 @@ future publication of Beatwise 0.2.0.
 - Rust edition: 2024
 - Minimum supported Rust version: 1.85
 - Runtime dependencies: none
-- Publication: disabled until a separate explicitly authorized release task
+- Publication target: crates.io only; no upload is authorized by this document
 
 The former Thumper identity is retained only in repository history. The active
 repository, package metadata, documentation, examples, and Rust imports use one
@@ -29,6 +29,7 @@ Run from a clean checkout of the candidate commit:
 ```bash
 grep -q 'repository = "https://github.com/Gardlok/beatwise"' Cargo.toml &&
 grep -q 'homepage = "https://github.com/Gardlok/beatwise"' Cargo.toml &&
+grep -Fq 'publish = ["crates-io"]' Cargo.toml &&
 cargo tree --depth 0 &&
 cargo fmt --all --check &&
 cargo clippy --all-targets -- -D warnings &&
@@ -38,6 +39,7 @@ cargo +1.85.0 check --all-targets &&
 cargo +1.85.0 test &&
 cargo package --list &&
 cargo package &&
+cargo publish --dry-run --registry crates-io &&
 cargo run --example fixed_monitor &&
 cargo run --example learned_monitor &&
 cargo run --example health_report
@@ -48,6 +50,7 @@ git status
 Expected results:
 
 - package repository and homepage metadata point to `Gardlok/beatwise`;
+- publication is restricted to the `crates-io` registry;
 - `cargo tree --depth 0` shows `beatwise v0.2.0` and no dependencies;
 - 30 internal unit tests pass;
 - 4 external integration tests pass;
@@ -55,6 +58,7 @@ Expected results:
 - Rust 1.85.0 builds all targets and passes the test suite;
 - package listing contains 33 files after Cargo adds generated metadata;
 - the extracted package archive compiles successfully;
+- `cargo publish --dry-run --registry crates-io` completes without uploading;
 - all three examples run successfully;
 - the worktree remains clean and synchronized.
 
@@ -100,30 +104,36 @@ not be treated as either availability or ownership.
 Do not attempt to publish over an existing package or assume ownership from a
 similar repository name.
 
-## Publication safety latch
+## Publication enablement
 
-The candidate manifest must continue to contain:
+The candidate manifest must contain:
 
 ```toml
-publish = false
+publish = ["crates-io"]
 ```
 
-Enabling publication, authenticating Cargo, uploading the crate, creating a Git
-tag, or creating a GitHub release are all outside this phase. Those actions
-require separate explicit authorization after the full gate above passes.
+This restricts publication to crates.io and allows Cargo's package and publish
+dry-run checks to exercise the real release path. It does **not** authorize an
+upload.
 
-## Future authorized release sequence
+Do not run `cargo publish` without `--dry-run`, create a Git tag, or create a
+GitHub release until the enablement PR is merged, the exact merged commit passes
+the full gate again, and publication receives separate explicit authorization.
 
-Once publication is explicitly authorized:
+## Authorized release sequence
 
-1. Reconfirm the exact candidate commit and clean worktree.
-2. Recheck the `beatwise` registry name.
-3. Review the generated package contents and extracted build one final time.
-4. Change the publication setting in a focused release PR.
-5. Merge only after local qualification passes again.
-6. Publish the exact merged commit.
-7. Verify crates.io and docs.rs metadata.
-8. Tag the published commit and create release notes from `CHANGELOG.md`.
+1. Merge the publication-enablement PR only after local qualification and the
+   crates.io dry run pass.
+2. Switch to `main`, pull the exact merged commit, and confirm a clean worktree.
+3. Recheck that the exact `beatwise` registry name still returns `404`.
+4. Repeat the full local qualification, package inspection, and publish dry run.
+5. Record the final candidate commit and package archive checksum.
+6. Obtain explicit authorization for the irreversible crates.io upload.
+7. Authenticate Cargo as needed and run `cargo publish --registry crates-io` from
+   the exact reviewed commit.
+8. Verify the published crates.io metadata and docs.rs build.
+9. Tag the published commit as `v0.2.0` and create the GitHub release from
+   `CHANGELOG.md`.
 
 Publishing is permanent for a given crate version. Never publish from a dirty
 worktree, an unmerged branch, or a commit that differs from the reviewed package.
