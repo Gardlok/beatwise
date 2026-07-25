@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Thumper are documented in this file.
+All notable changes to Beatwise are documented in this file.
 
 The project follows Semantic Versioning. Versions before 1.0 may make breaking
 API changes in a minor release.
@@ -26,9 +26,9 @@ No unreleased changes.
 
 ### Changed
 
-- Replaced the legacy 0.1.x DJ/deck/output API with the modern monitoring core.
+- Replaced the legacy Thumper 0.1.x DJ/deck/output API with the modern monitoring core.
 - Promoted the qualified implementation from the temporary `v2/` package to the repository root.
-- Selected `thumper-monitor` as the crates.io package name while retaining `thumper` as the library crate and Rust import path.
+- Renamed the modern project, package, library crate, documentation identity, and Rust import path to `beatwise`.
 
 ### Removed
 
