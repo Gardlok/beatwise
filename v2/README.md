@@ -18,6 +18,7 @@ original crate while the new API and timing models mature.
 - Rejection accounting for observations outside a trusted trained range.
 - Explicit `Starting`, `Learning`, `Healthy`, `Late`, and `Stopped` states.
 - Independent pull-driven cursors for meaningful health-state transitions.
+- Policy-driven aggregate summaries and full health reports.
 - Stopped tasks remain observable until explicitly purged.
 - Opaque, monotonically allocated task IDs that are never reused.
 - Deterministic unit tests that do not sleep.
@@ -38,6 +39,12 @@ Transition observation is also bounded and caller-driven. Each cursor stores
 one compact health-state tag per retained task it has observed. Cursors do not
 retain event history, do not drain a shared queue, and do not run callbacks on a
 Thumper-owned thread.
+
+Aggregate observation is calculated on demand. A compact summary keeps no task
+snapshot allocation, while a full report returns the same verdict plus sorted
+status snapshots. The caller supplies the policy, so Thumper does not silently
+assume whether starting, learning, or intentionally stopped tasks should fail a
+particular deployment's health endpoint.
 
 ## Learned frequency
 
@@ -191,6 +198,53 @@ changing.
 claim about when a deadline was crossed between polls. A stopped task is emitted
 as `Stopped` while retained. After `Monitor::purge_stopped`, a full cursor poll
 prunes that task's compact state tag.
+
+## Aggregate health reports
+
+A monitor can produce a compact aggregate summary for a health endpoint or a
+full report for diagnostics:
+
+```rust
+use std::time::Duration;
+use thumper_v2::{HealthPolicy, HealthVerdict, Monitor, TaskConfig, Timing};
+
+let monitor = Monitor::new();
+let heartbeat = monitor.register(TaskConfig::new(
+    "api-worker",
+    Timing::fixed(Duration::from_secs(1)),
+))?;
+
+let readiness = monitor.summary(HealthPolicy::readiness());
+assert_eq!(readiness.verdict, HealthVerdict::Degraded);
+assert_eq!(readiness.counts.starting, 1);
+
+heartbeat.beat()?;
+
+let liveness = monitor.report(HealthPolicy::liveness());
+println!(
+    "verdict={:?}, considered={}, ignored={}",
+    liveness.summary.verdict,
+    liveness.summary.considered_tasks,
+    liveness.summary.ignored_tasks,
+);
+for task in liveness.tasks.iter() {
+    println!("{}: {:?}", task.name, task.health);
+}
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`HealthPolicy::readiness()` treats starting and learning as degraded and late or
+stopped as unhealthy. `HealthPolicy::liveness()` accepts starting and learning,
+rejects late tasks, and ignores retained stopped records. `HealthPolicy::strict()`
+accepts only healthy tasks. Any state mapping can be changed with
+`with_impact`.
+
+Counts always include every retained task, even states ignored by the verdict.
+A verdict is `Empty` when the monitor has no retained tasks or when the selected
+policy ignores all retained tasks. `summary()` avoids retaining task snapshots;
+`report()` returns snapshots ordered by task ID and classified at the same
+monotonic observation tick as its summary.
 
 ## Validation
 
