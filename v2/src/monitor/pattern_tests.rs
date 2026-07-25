@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use super::{Health, Heartbeat, Monitor, TimingStatus};
 use crate::{
-    Adaptation, ConfigError, LearnedTiming, LearningModel, PatternConfig, RegisterError, TaskConfig,
-    Timing,
+    Adaptation, ConfigError, LearnedTiming, LearningModel, PatternConfig, RegisterError,
+    TaskConfig, Timing,
 };
 
 fn train_three_phase_pattern() -> (Monitor, Heartbeat, u64) {
