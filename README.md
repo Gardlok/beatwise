@@ -1,58 +1,34 @@
 # Beatwise
 
-Beatwise is a lightweight, runtime-neutral heartbeat monitor for long-running tasks.
-It supports fixed intervals, bounded learned timing, repeating-pattern discovery,
-pull-driven state transitions, and policy-driven aggregate health reports without
-spawning background threads or retaining unbounded event history.
+Beatwise is a small Rust library for watching long-running work.
 
-Version 0.2.0 replaces the legacy Thumper DJ/deck/output API from the 0.1.x line
-with the modern monitoring core. The old implementation remains available through
-Git history, but it is no longer part of the root package.
+A task calls `beat()` whenever it makes progress. Beatwise tracks that rhythm and
+reports whether the task is `Starting`, `Learning`, `Healthy`, `Late`, or `Stopped`.
 
-## Current scope
+It works well for background workers, sync loops, schedulers, queue consumers,
+device pollers, backups, peer maintenance, and other jobs that should keep moving.
 
-- Standard-library-only core with no runtime dependencies.
-- No internal background threads or heartbeat event queue.
-- Fixed-interval health monitoring.
-- Learned timing with three bounded models:
-  - constant-memory EWMA;
-  - a fixed-capacity median/MAD robust window;
-  - bounded repeating-pattern discovery with phase-aware deadlines.
-- Confidence reporting for learned baselines.
-- Explicit baseline retraining without replacing the heartbeat handle.
-- Rejection accounting for observations outside a trusted trained range.
-- Explicit `Starting`, `Learning`, `Healthy`, `Late`, and `Stopped` states.
-- Independent pull-driven cursors for meaningful health-state transitions.
-- Policy-driven aggregate summaries and full health reports.
-- Stopped tasks remain observable until explicitly purged.
-- Opaque, monotonically allocated task IDs that are never reused.
-- Deterministic tests that do not sleep.
+Beatwise can watch a known interval, learn a task's normal pace, or learn a
+repeating cycle. It uses only the standard library, starts no threads, and does
+not require an async runtime.
 
-The fixed-timing heartbeat path performs only atomic operations and a monotonic
-clock read. Learned timing adds one small per-task mutex. EWMA retains only its
-current aggregate values. The optional robust model allocates one fixed-size
-buffer only when selected and retains at most 31 interval samples.
+## What it provides
 
-Repeating-pattern discovery is also opt-in. Pattern tasks allocate one bounded
-64-interval buffer while learning. The detector considers cycles of two through
-eight phases, uses per-phase medians and median absolute deviations, rejects
-constant-frequency false positives through a configurable contrast threshold,
-and discards the learning buffer as an authority once a cycle is established.
-No timing model retains unbounded history.
+- Fixed deadlines for predictable work.
+- Learned timing for jobs whose pace changes.
+- A robust model for occasional outliers.
+- Repeating-pattern detection for multi-phase work.
+- Independent transition cursors and aggregate health reports.
+- Bounded memory with no event queue or unbounded history.
 
-Transition observation is bounded and caller-driven. Each cursor stores one
-compact health-state tag per retained task it has observed. Cursors do not retain
-event history, drain a shared queue, or run callbacks on a Beatwise-owned thread.
+All timing stays inside the caller's process. Fixed heartbeats use atomics and a
+monotonic clock read. Learned tasks add one small mutex. Stopped tasks remain
+visible until explicitly purged.
 
-Aggregate observation is calculated on demand. A compact summary keeps no task
-snapshot allocation, while a full report returns the same verdict plus sorted
-status snapshots. The caller supplies the policy, so Beatwise does not silently
-assume whether starting, learning, or intentionally stopped tasks should fail a
-particular deployment's health endpoint.
+## Learn a task's normal pace
 
-## Learned frequency
-
-EWMA remains the default and has the smallest per-task state:
+EWMA is the default learned model. It uses constant memory and adapts gradually as
+the task changes:
 
 ```rust
 use std::time::Duration;
@@ -79,8 +55,8 @@ for status in monitor.snapshot() {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-For workloads that occasionally produce extreme interval outliers, select the
-bounded robust model:
+For jobs with occasional long pauses or extreme outliers, use the bounded robust
+window:
 
 ```rust
 use std::time::Duration;
@@ -103,13 +79,13 @@ monitor.retrain(task_id)?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Robust window capacities must be odd numbers from 5 through 31.
+Robust windows use odd capacities from 5 through 31. `Monitor::retrain` clears the
+learned baseline without replacing the task ID or heartbeat handle.
 
-## Repeating patterns
+## Learn repeating work
 
-A process may be healthy while deliberately alternating between short and long
-work phases. The repeating-pattern model learns that cycle instead of reducing
-it to one misleading average:
+Some healthy jobs alternate between short and long phases. The repeating-pattern
+model learns that cycle instead of forcing it into one average:
 
 ```rust
 use std::time::Duration;
@@ -138,22 +114,14 @@ heartbeat.beat()?;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`maximum_period` must be from 2 through 8, and `minimum_cycles` must be from 3
-through 8. Candidate cycles are selected from a bounded 64-interval window. A
-trained pattern reports its phase intervals, deviations, next expected phase,
-and phase-specific deadline through `TimingStatus::PatternLearned`.
+Patterns can have two through eight phases and require three through eight cycles.
+Beatwise learns from at most 64 intervals. An outlier still counts as a heartbeat
+and advances the phase, but it does not replace the trusted baseline.
 
-An outlier after training remains a valid liveness signal, advances the cycle
-phase, and increments `rejected_samples`, but it does not overwrite the trusted
-phase baseline. `Monitor::retrain` clears either a single-frequency or pattern
-baseline while preserving the task ID, heartbeat count, lifecycle, and handle.
-The first interval after reset is ignored so reset latency cannot contaminate the
-new baseline.
+## Watch state changes
 
-## Health transitions
-
-A transition cursor lets a caller react to state changes without diffing detailed
-snapshots or giving Beatwise ownership of an executor:
+A transition cursor reports meaningful state changes without callbacks or a shared
+event queue:
 
 ```rust
 use std::time::Duration;
@@ -185,21 +153,13 @@ for transition in transitions.poll() {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Each cursor has its own sequence numbers and observations, so multiple consumers
-can watch the same monitor independently. `poll()` returns transitions ordered by
-task ID. `poll_task()` observes one task. Repeated polls within the same stable
-state return no transition even though elapsed durations in the full status keep
-changing.
+Each cursor is independent. `poll()` returns only state changes, ordered by task
+ID. Beatwise does not run callbacks or own an executor.
 
-`observed_after` records when the cursor noticed a transition; it is not an exact
-claim about when a deadline was crossed between polls. A stopped task is emitted
-as `Stopped` while retained. After `Monitor::purge_stopped`, a full cursor poll
-prunes that task's compact state tag.
+## Build health endpoints
 
-## Aggregate health reports
-
-A monitor can produce a compact aggregate summary for a health endpoint or a
-full report for diagnostics:
+Use a summary for a lightweight health check or a full report when you need task
+details:
 
 ```rust
 use std::time::Duration;
@@ -231,16 +191,14 @@ for task in liveness.tasks.iter() {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`HealthPolicy::readiness()` treats starting and learning as degraded and late or
-stopped as unhealthy. `HealthPolicy::liveness()` accepts starting and learning,
-rejects late tasks, and ignores retained stopped records. `HealthPolicy::strict()`
-accepts only healthy tasks. Any state mapping can be changed with `with_impact`.
+`readiness()` treats starting and learning tasks as degraded. `liveness()` allows
+those states, fails late tasks, and ignores stopped records. `strict()` accepts
+only healthy tasks. Custom policies can change how any state affects the verdict.
 
-Counts always include every retained task, even states ignored by the verdict.
-A verdict is `Empty` when the monitor has no retained tasks or when the selected
-policy ignores all retained tasks. `summary()` avoids retaining task snapshots;
-`report()` returns snapshots ordered by task ID and classified at the same
-monotonic observation tick as its summary.
+## Version note
+
+Beatwise 0.2.0 replaces the old Thumper 0.1.x DJ, deck, and output API. The old
+implementation remains available in Git history.
 
 ## Validation
 
@@ -252,5 +210,5 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
 cargo package --list
-cargo package --allow-dirty
+cargo package
 ```
