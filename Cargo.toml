@@ -1,5 +1,5 @@
 [package]
-name = "thumper"
+name = "beatwise"
 version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
@@ -9,14 +9,14 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/Gardlok/thumper"
 homepage = "https://github.com/Gardlok/thumper"
-documentation = "https://docs.rs/thumper"
+documentation = "https://docs.rs/beatwise"
 keywords = ["heartbeat", "health-check", "liveness", "monitoring", "reliability"]
 categories = ["concurrency", "development-tools::debugging"]
-include = ["src/**/*", "tests/**/*", "examples/**/*", "README.md", "LICENSE"]
+include = ["src/**/*", "tests/**/*", "examples/**/*", "README.md", "CHANGELOG.md", "LICENSE"]
 publish = false
 
 [lib]
-name = "thumper"
+name = "beatwise"
 path = "src/lib.rs"
 
 [dependencies]

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use thumper::{
+use beatwise::{
     Health, HealthPolicy, HealthState, HealthVerdict, LearnedTiming, LearningModel, Monitor,
     TaskConfig, Timing, TimingStatus,
 };
