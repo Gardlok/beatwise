@@ -1,92 +1,8 @@
-use std::{
-    sync::{Mutex, MutexGuard},
-    time::Duration,
-};
-
-use crate::{
-    config::{LearnedTiming, LearningModel, MAX_ROBUST_WINDOW},
-    status::Confidence,
-};
-
-#[derive(Clone, Copy, Debug, Default)]
-struct EwmaState {
-    mean_micros: f64,
-    deviation_micros: f64,
-}
-
-impl EwmaState {
-    fn update(&mut self, observed: f64, alpha: f64) {
-        if self.mean_micros <= 0.0 {
-            self.mean_micros = observed;
-            self.deviation_micros = 0.0;
-            return;
-        }
-
-        let delta = observed - self.mean_micros;
-        self.mean_micros += alpha * delta;
-        self.deviation_micros += alpha * (delta.abs() - self.deviation_micros);
-        self.deviation_micros = self.deviation_micros.max(0.0);
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct RobustWindowState {
-    values: [u64; MAX_ROBUST_WINDOW],
-    capacity: u8,
-    len: u8,
-    cursor: u8,
-}
-
-impl RobustWindowState {
-    fn new(capacity: u8) -> Self {
-        Self {
-            values: [0; MAX_ROBUST_WINDOW],
-            capacity,
-            len: 0,
-            cursor: 0,
-        }
-    }
-
-    fn push(&mut self, observed_micros: u64) {
-        let cursor = usize::from(self.cursor);
-        self.values[cursor] = observed_micros;
-
-        if self.len < self.capacity {
-            self.len += 1;
-        }
-
-        self.cursor = (self.cursor + 1) % self.capacity;
-    }
-
-    fn center_micros(&self) -> Option<f64> {
-        let len = usize::from(self.len);
-        if len == 0 {
-            return None;
-        }
-
-        let mut values = self.values;
-        Some(median(&mut values[..len]))
-    }
-
-    fn deviation_micros(&self) -> Option<f64> {
-        let len = usize::from(self.len);
-        let center = self.center_micros()?;
-        let mut deviations = [0_u64; MAX_ROBUST_WINDOW];
-
-        for (target, value) in deviations.iter_mut().zip(self.values.iter()).take(len) {
-            *target = value.abs_diff(center.round() as u64);
-        }
-
-        // 1.4826 scales MAD toward a standard-deviation-like quantity for
-        // normally distributed samples while retaining robust outlier behavior.
-        Some(median(&mut deviations[..len]) * 1.4826)
-    }
-}
-
 #[derive(Debug)]
 enum EstimatorState {
     Ewma(EwmaState),
     Robust(Box<RobustWindowState>),
+    Pattern(Box<PatternState>),
 }
 
 #[derive(Debug)]
@@ -104,6 +20,9 @@ impl LearningState {
             LearningModel::Ewma => EstimatorState::Ewma(EwmaState::default()),
             LearningModel::RobustWindow { capacity } => {
                 EstimatorState::Robust(Box::new(RobustWindowState::new(capacity)))
+            }
+            LearningModel::RepeatingPattern(config) => {
+                EstimatorState::Pattern(Box::new(PatternState::new(config)))
             }
         };
 
@@ -132,6 +51,26 @@ impl LearningState {
             return;
         }
 
+        let pattern_result = match &mut self.estimator {
+            EstimatorState::Pattern(state) => {
+                let result = state.observe(observed, config);
+                Some((result, state.is_trained()))
+            }
+            EstimatorState::Ewma(_) | EstimatorState::Robust(_) => None,
+        };
+        if let Some((result, trained)) = pattern_result {
+            match result {
+                PatternObservation::Accepted => {
+                    self.accepted_samples = self.accepted_samples.saturating_add(1);
+                }
+                PatternObservation::Rejected => {
+                    self.rejected_samples = self.rejected_samples.saturating_add(1);
+                }
+            }
+            self.trained = trained;
+            return;
+        }
+
         if self.trained && !self.within_trusted_range(observed, config) {
             self.rejected_samples = self.rejected_samples.saturating_add(1);
             return;
@@ -155,6 +94,7 @@ impl LearningState {
                 EstimatorState::Robust(state) => {
                     state.push(observed.round().min(u64::MAX as f64) as u64);
                 }
+                EstimatorState::Pattern(_) => unreachable!("pattern observations return early"),
             }
         }
 
@@ -175,6 +115,7 @@ impl LearningState {
                         post_training.checked_rem(stride) == Some(0)
                     })
             }
+            EstimatorState::Pattern(_) => false,
         }
     }
 
@@ -208,6 +149,7 @@ impl LearningState {
             EstimatorState::Robust(state) => LearningModel::RobustWindow {
                 capacity: state.capacity,
             },
+            EstimatorState::Pattern(state) => LearningModel::RepeatingPattern(state.config),
         }
     }
 
@@ -227,6 +169,7 @@ impl LearningState {
         match &self.estimator {
             EstimatorState::Ewma(state) => (self.accepted_samples > 0).then_some(state.mean_micros),
             EstimatorState::Robust(state) => state.center_micros(),
+            EstimatorState::Pattern(state) => state.expected_center(),
         }
     }
 
@@ -236,6 +179,7 @@ impl LearningState {
                 (self.accepted_samples > 0).then_some(state.deviation_micros)
             }
             EstimatorState::Robust(state) => state.deviation_micros(),
+            EstimatorState::Pattern(state) => state.expected_deviation(),
         }
     }
 
@@ -262,9 +206,78 @@ impl LearningState {
         self.deadline_micros(config).map(duration_from_micros)
     }
 
+    pub(crate) fn pattern_config(&self) -> Option<PatternConfig> {
+        match &self.estimator {
+            EstimatorState::Pattern(state) => Some(state.config),
+            EstimatorState::Ewma(_) | EstimatorState::Robust(_) => None,
+        }
+    }
+
+    pub(crate) fn pattern_candidate_period(&self) -> Option<u8> {
+        match &self.estimator {
+            EstimatorState::Pattern(state) => state.best_candidate,
+            EstimatorState::Ewma(_) | EstimatorState::Robust(_) => None,
+        }
+    }
+
+    pub(crate) fn pattern_period(&self) -> Option<u8> {
+        match &self.estimator {
+            EstimatorState::Pattern(state) if state.is_trained() => Some(state.period),
+            EstimatorState::Pattern(_) | EstimatorState::Ewma(_) | EstimatorState::Robust(_) => None,
+        }
+    }
+
+    pub(crate) fn pattern_next_phase(&self) -> Option<u8> {
+        match &self.estimator {
+            EstimatorState::Pattern(state) if state.is_trained() => Some(state.next_phase),
+            EstimatorState::Pattern(_) | EstimatorState::Ewma(_) | EstimatorState::Robust(_) => None,
+        }
+    }
+
+    pub(crate) fn pattern_intervals(&self) -> Option<Vec<Duration>> {
+        match &self.estimator {
+            EstimatorState::Pattern(state) => state.intervals(),
+            EstimatorState::Ewma(_) | EstimatorState::Robust(_) => None,
+        }
+    }
+
+    pub(crate) fn pattern_deviations(&self) -> Option<Vec<Duration>> {
+        match &self.estimator {
+            EstimatorState::Pattern(state) => state.phase_deviations(),
+            EstimatorState::Ewma(_) | EstimatorState::Robust(_) => None,
+        }
+    }
+
     pub(crate) fn confidence(&self, config: LearnedTiming) -> Confidence {
         if !self.trained {
             return Confidence::Insufficient;
+        }
+
+        if let EstimatorState::Pattern(state) = &self.estimator {
+            let period = u32::from(state.period).max(1);
+            let cycles = self.accepted_samples / period;
+            let minimum_cycles = u32::from(state.config.minimum_cycles);
+            let rejected_ratio = f64::from(self.rejected_samples)
+                / f64::from(
+                    self.accepted_samples
+                        .saturating_add(self.rejected_samples)
+                        .max(1),
+                );
+            let tolerance = f64::from(state.config.tolerance_percent) / 100.0;
+
+            if cycles >= minimum_cycles.saturating_mul(3)
+                && state.fit_residual_ratio <= tolerance / 2.0
+                && rejected_ratio <= 0.10
+            {
+                return Confidence::High;
+            }
+            if cycles >= minimum_cycles.saturating_mul(2)
+                && state.fit_residual_ratio <= tolerance
+                && rejected_ratio <= 0.20
+            {
+                return Confidence::Medium;
+            }
+            return Confidence::Low;
         }
 
         let Some(center) = self.center_micros() else {
@@ -292,29 +305,4 @@ impl LearningState {
             Confidence::Low
         }
     }
-}
-
-pub(crate) fn lock_learning(state: &Mutex<LearningState>) -> MutexGuard<'_, LearningState> {
-    state
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-}
-
-fn median(values: &mut [u64]) -> f64 {
-    values.sort_unstable();
-    let midpoint = values.len() / 2;
-
-    if values.len() & 1 == 0 {
-        (values[midpoint - 1] as f64 + values[midpoint] as f64) / 2.0
-    } else {
-        values[midpoint] as f64
-    }
-}
-
-fn duration_from_micros(micros: f64) -> Duration {
-    if !micros.is_finite() || micros <= 0.0 {
-        return Duration::ZERO;
-    }
-
-    Duration::from_micros(micros.round().min(u64::MAX as f64) as u64)
 }

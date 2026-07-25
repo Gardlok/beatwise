@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use crate::config::{Adaptation, LearningModel};
+use crate::config::{Adaptation, LearningModel, PatternConfig};
 
 /// An opaque identifier for a monitored task.
 ///
@@ -91,6 +91,27 @@ pub enum TimingStatus {
         rejected_samples: u32,
         interval: Duration,
         deviation: Duration,
+        deadline: Duration,
+        adaptation: Adaptation,
+        confidence: Confidence,
+    },
+    PatternLearning {
+        config: PatternConfig,
+        samples: u32,
+        rejected_samples: u32,
+        minimum_samples: u32,
+        candidate_period: Option<u8>,
+        confidence: Confidence,
+    },
+    PatternLearned {
+        config: PatternConfig,
+        samples: u32,
+        rejected_samples: u32,
+        period: u8,
+        next_phase: u8,
+        intervals: Arc<[Duration]>,
+        deviations: Arc<[Duration]>,
+        expected_interval: Duration,
         deadline: Duration,
         adaptation: Adaptation,
         confidence: Confidence,

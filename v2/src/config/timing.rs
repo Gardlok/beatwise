@@ -1,60 +1,3 @@
-use std::{error::Error, fmt, sync::Arc, time::Duration};
-
-pub(crate) const MAX_ROBUST_WINDOW: usize = 31;
-
-/// Controls how a learned model changes after its training phase.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Adaptation {
-    /// Keep the learned baseline fixed after the minimum sample count is met.
-    FrozenAfterTraining,
-
-    /// Accept healthy observations with a conservative adaptation rate.
-    #[default]
-    Slow,
-
-    /// Accept healthy observations with a faster adaptation rate.
-    Continuous,
-}
-
-impl Adaptation {
-    pub(crate) fn alpha(self) -> f64 {
-        match self {
-            Self::FrozenAfterTraining => 0.0,
-            Self::Slow => 0.05,
-            Self::Continuous => 0.20,
-        }
-    }
-
-    pub(crate) fn robust_update_stride(self) -> Option<u32> {
-        match self {
-            Self::FrozenAfterTraining => None,
-            Self::Slow => Some(4),
-            Self::Continuous => Some(1),
-        }
-    }
-}
-
-/// Statistical model used to learn a task's heartbeat frequency.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum LearningModel {
-    /// Constant-memory exponentially weighted moving statistics.
-    #[default]
-    Ewma,
-
-    /// A bounded median and median-absolute-deviation window.
-    ///
-    /// The capacity must be an odd number from 5 through 31.
-    RobustWindow { capacity: u8 },
-}
-
-impl LearningModel {
-    /// Creates a bounded robust window model.
-    #[must_use]
-    pub const fn robust_window(capacity: u8) -> Self {
-        Self::RobustWindow { capacity }
-    }
-}
-
 /// Fixed timing configuration for a task.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FixedTiming {
@@ -96,12 +39,12 @@ impl FixedTiming {
     }
 }
 
-/// Learned-frequency configuration for a task.
+/// Learned timing configuration for a task.
 ///
 /// The default model uses an exponentially weighted moving mean and absolute
-/// deviation. Callers may instead select a bounded robust window that uses the
-/// median and scaled median absolute deviation. Both models reject observations
-/// outside the trusted healthy range after training.
+/// deviation. Callers may instead select a bounded robust window or bounded
+/// repeating-pattern discovery. All trained models reject observations outside
+/// their trusted range while still treating those beats as liveness signals.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct LearnedTiming {
     pub(crate) minimum_samples: u32,
@@ -193,7 +136,7 @@ pub enum Timing {
     /// Use a caller-provided expected interval.
     Fixed(FixedTiming),
 
-    /// Learn the expected interval from healthy heartbeat observations.
+    /// Learn expected timing from healthy heartbeat observations.
     Learned(LearnedTiming),
 }
 
@@ -265,10 +208,30 @@ impl TaskConfig {
                 if !learned.sensitivity.is_finite() || learned.sensitivity <= 0.0 {
                     return Err(ConfigError::InvalidSensitivity);
                 }
-                if let LearningModel::RobustWindow { capacity } = learned.model {
-                    let capacity = usize::from(capacity);
-                    if !(5..=MAX_ROBUST_WINDOW).contains(&capacity) || capacity & 1 == 0 {
-                        return Err(ConfigError::InvalidRobustWindowCapacity);
+
+                match learned.model {
+                    LearningModel::Ewma => {}
+                    LearningModel::RobustWindow { capacity } => {
+                        let capacity = usize::from(capacity);
+                        if !(5..=MAX_ROBUST_WINDOW).contains(&capacity) || capacity & 1 == 0 {
+                            return Err(ConfigError::InvalidRobustWindowCapacity);
+                        }
+                    }
+                    LearningModel::RepeatingPattern(pattern) => {
+                        let maximum_period = usize::from(pattern.maximum_period);
+                        let minimum_cycles = usize::from(pattern.minimum_cycles);
+                        if !(2..=MAX_PATTERN_PERIOD).contains(&maximum_period) {
+                            return Err(ConfigError::InvalidPatternMaximumPeriod);
+                        }
+                        if !(3..=MAX_PATTERN_CYCLES).contains(&minimum_cycles) {
+                            return Err(ConfigError::InvalidPatternMinimumCycles);
+                        }
+                        if !(1..=50).contains(&pattern.tolerance_percent) {
+                            return Err(ConfigError::InvalidPatternTolerance);
+                        }
+                        if !(1..=100).contains(&pattern.minimum_contrast_percent) {
+                            return Err(ConfigError::InvalidPatternContrast);
+                        }
                     }
                 }
             }
@@ -284,91 +247,3 @@ impl TaskConfig {
         })
     }
 }
-
-/// A task configuration error.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConfigError {
-    EmptyName,
-    ZeroInterval,
-    ZeroStartupGrace,
-    TooFewLearningSamples,
-    InvalidSensitivity,
-    InvalidRobustWindowCapacity,
-}
-
-impl fmt::Display for ConfigError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::EmptyName => formatter.write_str("task name cannot be empty"),
-            Self::ZeroInterval => formatter.write_str("fixed interval cannot be zero"),
-            Self::ZeroStartupGrace => formatter.write_str("startup grace cannot be zero"),
-            Self::TooFewLearningSamples => {
-                formatter.write_str("learned timing requires at least two interval samples")
-            }
-            Self::InvalidSensitivity => {
-                formatter.write_str("learned timing sensitivity must be finite and positive")
-            }
-            Self::InvalidRobustWindowCapacity => formatter.write_str(
-                "robust learning window capacity must be an odd number from 5 through 31",
-            ),
-        }
-    }
-}
-
-impl Error for ConfigError {}
-
-/// A task registration error.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RegisterError {
-    InvalidConfig(ConfigError),
-    IdSpaceExhausted,
-}
-
-impl fmt::Display for RegisterError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidConfig(error) => write!(formatter, "invalid task configuration: {error}"),
-            Self::IdSpaceExhausted => formatter.write_str("task ID space exhausted"),
-        }
-    }
-}
-
-impl Error for RegisterError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::InvalidConfig(error) => Some(error),
-            Self::IdSpaceExhausted => None,
-        }
-    }
-}
-
-impl From<ConfigError> for RegisterError {
-    fn from(error: ConfigError) -> Self {
-        Self::InvalidConfig(error)
-    }
-}
-
-/// Returned when a learned task cannot be retrained.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RetrainError {
-    /// No retained task exists for the supplied identifier.
-    UnknownTask,
-
-    /// Fixed timing has no learned baseline to reset.
-    FixedTiming,
-
-    /// Stopped tasks cannot re-enter learning.
-    Stopped,
-}
-
-impl fmt::Display for RetrainError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnknownTask => formatter.write_str("task is not registered"),
-            Self::FixedTiming => formatter.write_str("fixed timing cannot be retrained"),
-            Self::Stopped => formatter.write_str("stopped task cannot be retrained"),
-        }
-    }
-}
-
-impl Error for RetrainError {}
