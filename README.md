@@ -78,14 +78,17 @@ learned timing when the workload itself is the best source of that expectation.
 
 ## Lifecycle and ownership
 
-A fixed task begins in `Starting` and becomes `Healthy` after its first beat. A
-learned task begins in `Learning` and remains there until enough accepted
-intervals establish a baseline. Running tasks then move between `Healthy` and
-`Late` as their silence crosses the current deadline.
+Every task begins in `Starting`. Before the first beat, it remains there until its
+startup grace expires; continued silence then makes it `Late`. After the first
+beat, fixed timing can become `Healthy`, while learned timing enters `Learning`
+until enough accepted intervals establish a baseline. Running tasks then move
+between `Healthy` and `Late` as their silence crosses the current deadline.
 
 ```text
-fixed:    Starting ── first beat ──> Healthy <──> Late
-learned:  Learning ── trained ─────> Healthy <──> Late
+registered task ──> Starting
+
+fixed first beat ───────────────> Healthy <──> Late
+learned first beat ──> Learning ── trained ──> Healthy <──> Late
 
 running task ── explicit stop or final heartbeat drop ──> Stopped
 Stopped ── Monitor::purge_stopped() ────────────────────> removed
