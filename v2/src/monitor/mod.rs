@@ -20,6 +20,6 @@ include!("heartbeat.rs");
 include!("classification.rs");
 
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod pattern_tests;
+#[cfg(test)]
+mod tests;
