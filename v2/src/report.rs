@@ -45,7 +45,7 @@ pub enum HealthVerdict {
 impl HealthVerdict {
     /// Returns whether this verdict is fully nominal.
     #[must_use]
-    pub const fn is_nominal(self) -> bool {
+    pub const fn is_nominal(&self) -> bool {
         matches!(self, Self::Nominal)
     }
 }
@@ -255,7 +255,7 @@ impl HealthSummary {
 
     /// Returns whether the aggregate verdict is fully nominal.
     #[must_use]
-    pub const fn is_nominal(self) -> bool {
+    pub const fn is_nominal(&self) -> bool {
         self.verdict.is_nominal()
     }
 }
