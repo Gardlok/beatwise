@@ -88,9 +88,11 @@ impl Monitor {
     /// Registers a task and returns its heartbeat handle.
     ///
     /// Registration retains one task record until it is removed with
-    /// [`Monitor::purge_stopped`]. A fixed-timing task begins in
-    /// [`HealthState::Starting`], while a learned-timing task begins in
-    /// [`HealthState::Learning`]. No thread or timer is started.
+    /// [`Monitor::purge_stopped`]. Every task begins in
+    /// [`HealthState::Starting`]. After the first beat, fixed timing can become
+    /// [`HealthState::Healthy`], while learned timing enters
+    /// [`HealthState::Learning`] until its baseline is trained. No thread or
+    /// timer is started.
     ///
     /// # Errors
     ///
