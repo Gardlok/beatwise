@@ -1,6 +1,6 @@
 use std::{error::Error, time::Duration};
 
-use thumper_v2::{Adaptation, LearnedTiming, LearningModel, Monitor, TaskConfig, Timing};
+use thumper::{Adaptation, LearnedTiming, LearningModel, Monitor, TaskConfig, Timing};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let monitor = Monitor::new();

@@ -1,6 +1,6 @@
 use std::{error::Error, time::Duration};
 
-use thumper_v2::{HealthPolicy, Monitor, TaskConfig, Timing};
+use thumper::{HealthPolicy, Monitor, TaskConfig, Timing};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let monitor = Monitor::new();
