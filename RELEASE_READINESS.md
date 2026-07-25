@@ -1,23 +1,23 @@
-# Thumper 0.2.0 release readiness
+# Beatwise 0.2.0 release readiness
 
 This document defines the gate between the completed root migration and any
-future publication of Thumper 0.2.0.
+future publication of Beatwise 0.2.0.
 
 ## Package identity
 
-- Product and repository name: **Thumper**
-- crates.io package name: `thumper-monitor`
-- Library crate and Rust import path: `thumper`
+- Product name: **Beatwise**
+- Current repository location: `Gardlok/thumper`
+- crates.io package name: `beatwise`
+- Library crate and Rust import path: `beatwise`
 - Version: `0.2.0`
 - Rust edition: 2024
 - Minimum supported Rust version: 1.85
 - Runtime dependencies: none
 - Publication: disabled until a separate explicitly authorized release task
 
-The bare `thumper` package name is already used on crates.io by an unrelated
-project. The package name therefore differs from the library target name. Users
-will depend on `thumper-monitor` in `Cargo.toml` and import the library as
-`thumper` in Rust source.
+The former Thumper identity is retained only in repository history and the
+current GitHub repository path. Package metadata, documentation, examples, and
+Rust imports use one consistent Beatwise identity.
 
 Registry availability is time-sensitive. Immediately before publication, repeat
 the exact-name check rather than relying on this document or an older search.
@@ -45,7 +45,7 @@ git status
 
 Expected results:
 
-- `cargo tree --depth 0` shows `thumper-monitor v0.2.0` and no dependencies;
+- `cargo tree --depth 0` shows `beatwise v0.2.0` and no dependencies;
 - 30 internal unit tests pass;
 - 4 external integration tests pass;
 - 5 README-backed doctests pass;
@@ -61,9 +61,9 @@ Perform this check immediately before any authorized publish operation:
 
 ```bash
 status="$(curl -sS \
-  -o /tmp/thumper-monitor-crate.json \
+  -o /tmp/beatwise-crate.json \
   -w '%{http_code}' \
-  https://crates.io/api/v1/crates/thumper-monitor)"
+  https://crates.io/api/v1/crates/beatwise)"
 
 test "$status" = 404
 ```
@@ -81,21 +81,23 @@ publish = false
 ```
 
 Enabling publication, authenticating Cargo, uploading the crate, creating a Git
-tag, or creating a GitHub release are all outside this phase. Those actions
-require a separate explicit authorization after the full gate above passes.
+tag, renaming the GitHub repository, or creating a GitHub release are all outside
+this phase. Those actions require separate explicit authorization after the full
+gate above passes.
 
 ## Future authorized release sequence
 
 Once publication is explicitly authorized:
 
 1. Reconfirm the exact candidate commit and clean worktree.
-2. Recheck the `thumper-monitor` registry name.
-3. Review the generated package contents and extracted build one final time.
-4. Change the publication setting in a focused release PR.
-5. Merge only after local qualification passes again.
-6. Publish the exact merged commit.
-7. Verify crates.io and docs.rs metadata.
-8. Tag the published commit and create release notes from `CHANGELOG.md`.
+2. Recheck the `beatwise` registry name.
+3. Decide whether to rename the GitHub repository before release.
+4. Review the generated package contents and extracted build one final time.
+5. Change the publication setting in a focused release PR.
+6. Merge only after local qualification passes again.
+7. Publish the exact merged commit.
+8. Verify crates.io and docs.rs metadata.
+9. Tag the published commit and create release notes from `CHANGELOG.md`.
 
 Publishing is permanent for a given crate version. Never publish from a dirty
 worktree, an unmerged branch, or a commit that differs from the reviewed package.
