@@ -69,7 +69,7 @@ visible until explicitly purged.
 | Model | Best for | Main tradeoff |
 | --- | --- | --- |
 | Fixed | Pollers, schedulers, and jobs with a known expected interval | The caller must choose the interval and grace period |
-| EWMA | Workloads whose normal pace changes gradually | Accepted observations continuously influence the baseline |
+| EWMA | Workloads whose normal pace changes gradually | The trained baseline follows the selected adaptation policy |
 | Robust window | Bursty work with occasional extreme pauses or outliers | Keeps a small bounded sample window and requires an odd capacity |
 | Repeating pattern | Stable multi-phase work such as short/long processing cycles | Requires several complete cycles before the pattern is trusted |
 
