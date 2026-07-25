@@ -17,6 +17,7 @@ original crate while the new API and timing models mature.
 - Explicit baseline retraining without replacing the heartbeat handle.
 - Rejection accounting for observations outside a trusted trained range.
 - Explicit `Starting`, `Learning`, `Healthy`, `Late`, and `Stopped` states.
+- Independent pull-driven cursors for meaningful health-state transitions.
 - Stopped tasks remain observable until explicitly purged.
 - Opaque, monotonically allocated task IDs that are never reused.
 - Deterministic unit tests that do not sleep.
@@ -32,6 +33,11 @@ eight phases, uses per-phase medians and median absolute deviations, rejects
 constant-frequency false positives through a configurable contrast threshold,
 and discards the learning buffer as an authority once a cycle is established.
 No timing model retains unbounded history.
+
+Transition observation is also bounded and caller-driven. Each cursor stores
+one compact health-state tag per retained task it has observed. Cursors do not
+retain event history, do not drain a shared queue, and do not run callbacks on a
+Thumper-owned thread.
 
 ## Learned frequency
 
@@ -137,6 +143,54 @@ phase baseline. `Monitor::retrain` clears either a single-frequency or pattern
 baseline while preserving the task ID, heartbeat count, lifecycle, and handle.
 The first interval after reset is ignored so reset latency cannot contaminate the
 new baseline.
+
+## Health transitions
+
+A transition cursor lets a caller react to state changes without diffing detailed
+snapshots or giving Thumper ownership of an executor:
+
+```rust
+use std::time::Duration;
+use thumper_v2::{HealthState, Monitor, TaskConfig, Timing};
+
+let monitor = Monitor::new();
+let heartbeat = monitor.register(TaskConfig::new(
+    "worker",
+    Timing::fixed(Duration::from_secs(1)),
+))?;
+let mut transitions = monitor.transition_cursor();
+
+// First sight establishes this cursor's baseline.
+for transition in transitions.poll() {
+    assert_eq!(transition.previous, None);
+    assert_eq!(transition.current, HealthState::Starting);
+}
+
+heartbeat.beat()?;
+
+// A later poll reports only a meaningful stable-state change.
+for transition in transitions.poll() {
+    println!(
+        "{}: {:?} -> {:?}",
+        transition.status.name,
+        transition.previous,
+        transition.current,
+    );
+}
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Each cursor has its own sequence numbers and observations, so multiple consumers
+can watch the same monitor independently. `poll()` returns transitions ordered by
+task ID. `poll_task()` observes one task. Repeated polls within the same stable
+state return no transition even though elapsed durations in the full status keep
+changing.
+
+`observed_after` records when the cursor noticed a transition; it is not an exact
+claim about when a deadline was crossed between polls. A stopped task is emitted
+as `Stopped` while retained. After `Monitor::purge_stopped`, a full cursor poll
+prunes that task's compact state tag.
 
 ## Validation
 
